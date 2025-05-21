@@ -1,6 +1,6 @@
 # crossbill-wgs
 
-Samples for this project were obtained from the follhttps://github.com/tparchman/loxia_wgrsowing github repo
+Samples for this project were obtained from the https://github.com/tparchman/loxia_wgrs github repo
 
 ## Bioinformatics Pipeline
 
