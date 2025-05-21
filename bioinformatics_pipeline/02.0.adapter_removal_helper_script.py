@@ -6,44 +6,41 @@
 # module load python/3.12.7
 
 import pandas as pd
+import os
+
+fastq_dir = "/workdir/kcarbeck/rawdata"
 
 #df = pd.read_csv("/workdir/kcarbeck/crossbill_metadata_masterfile_030325.csv")
-
-df = pd.read_csv("/workdir/kcarbeck/rawdata/crossbill_metadataForAdapterRemoval.csv")
-
+df = pd.read_csv("/workdir/kcarbeck/crosbill_adapterRemoval.csv")
 
 commands = [] # create a list to store commands
 
-# for each row (i.e., each sample), gather the FASTQ files for R1 and R2
-for idx, row in df.iterrows():
-    # sample ID using ID column (preferred ID by crossbill group)
+for _, row in df.iterrows():
     sample_id = row["ID"] 
-    # create a pattern for each of the r1 and r2 columns 
-    r1_cols = [c for c in df.columns if "fastq_r1" in c] 
-    r2_cols = [c for c in df.columns if "fastq_r2" in c]  
-    # Filter out NaNs/empty cells in each row
-    r1_files = [str(row[c]) for c in r1_cols if pd.notnull(row[c])]
-    r2_files = [str(row[c]) for c in r2_cols if pd.notnull(row[c])]
-    # now build a list of files for AdapterRemoval (requires only spaces between files)
-    r1_string = " ".join(r1_files)
-    r2_string = " ".join(r2_files)
-    # build the AdapterRemoval command (with multiple FASTQs for some files)
-    #  add whatever args needed here
-    command_line = (
-        f"/programs/adapterremoval_2.1.1/bin/AdapterRemoval "
-        f"--file1 {r1_string} "
-        f"--file2 {r2_string} "
-        f"--adapter-list for_adapter_removal.txt "
-        f"--basename {sample_id} "
-        f"--trimns --trimqualities --minquality 35 --minlength 25 "
-        f"--collapse --threads 8 --gzip"
-    )
-    commands.append(command_line)
+    r1_file = row["r1"]
+    r2_file = row["r2"]
+    r1_path = os.path.join(fastq_dir, r1_file)
+    r2_path = os.path.join(fastq_dir, r2_file)
+    # only make command if both R1 and R2 files exists in dir
+    if os.path.exists(r1_path) and os.path.exists(r2_path):
+        command = (
+            f"/programs/adapterremoval_2.1.1/bin/AdapterRemoval "
+            f"--file1 {r1_file} "
+            f"--file2 {r2_file} "
+            f"--adapter-list for_adapter_removal.txt "
+            f"--basename {sample_id} "
+            f"--trimns --trimqualities --minquality 35 --minlength 25 "
+            f"--collapse --threads 8 --gzip"
+        )
+        commands.append(command)
 
-# write the commands to a text file
-with open("adapterRemovalCommands.txt", "w") as f:
+
+
+# write commands to file
+with open(os.path.join(fastq_dir, "adapterRemovalCommands.txt"), "w") as f:
     for cmd in commands:
         f.write(cmd + "\n")
+
 
 
 # wc -l adapterRemovalCommands.txt

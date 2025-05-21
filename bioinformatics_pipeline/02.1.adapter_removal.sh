@@ -2,6 +2,25 @@
 #author: katherine carbeck
 #3 march 2025
 
+cd /lustre2/home/lc736_0001/crossbill/rawdata
+#checksums at source
+find . -type f \( -name "*.fq.gz" -o -name "*.fastq.gz" \) -print0 \
+  | xargs -0 md5sum > crossbill_fastqs.md5 &
+
+#make a list of FASTQ files (ignore subdirs)
+find . -type f \( -name "*.fq.gz" -o -name "*.fastq.gz" \) > filelist.txt
+
+#copy them using rsync to one folder in workdir 
+rsync -avW --progress --partial \
+  --files-from=filelist_filtered.txt \
+  --no-relative \
+  /lustre2/home/lc736_0001/crossbill/rawdata/ \
+  /workdir/kcarbeck/rawdata/ &
+
+#checksums
+cd /workdir/kcarbeck/rawdata
+md5sum -c /lustre2/home/lc736_0001/crossbill/crossbill_fastqs.md5
+
 ##### ADAPTER REMOVAL
 
 #Trimns: Trim consecutive Ns from the 5’ and 3’ termini. If quality trimming is also enabled (--trimqualities), then stretches of mixed low-quality bases and/or Ns are trimmed.
@@ -17,48 +36,23 @@
 /programs/adapterremoval_2.1.1/bin/AdapterRemoval --file1 DP8400010194TL_L01_SP2004210287_1.fq.gz --file2 DP8400010194TL_L01_SP2004210287_2.fq.gz --adapter-list for_adapter_removal.txt --basename LC_2_170979 --trimns --trimqualities --minquality 35 --minlength 25 --collapse --threads 8 --gzip
 
 
-# run adapterRemovalCommands.txt in parallel on 40 core machine
+# run adapterRemovalCommands.txt in parallel on 88 core machine
 # this funnels the output to a log file and displays it on the screen
-parallel -j 5 < /workdir/kcarbeck/rawdata/adapterRemovalCommands.txt 2>&1 | tee adapterRemoval.log
-# started around 2PM 3 Mar 25; probably could've run more files at once?
-
-
-##################     4 March 2025    ##################
-# failed server ran out of storage
-
-# sync completed files
-rsync -av --progress /workdir/kcarbeck/rawdata/ /lustre2/home/lc736_0001/crossbill/rawdata/
-
-# copy all files in directory and subdirs without the dir structure 
-find /lustre2/home/lc736_0001/crossbill -type f \( -name "*.fq.gz" -o -name "*.fastq.gz" \) -exec cp -t /workdir/kcarbeck/rawdata/ {} +
-
-ls -1 | wc -l
-
-#remove files that have already been completed
-xargs rm < 02.X.filesToDelete.txt
-
-
-## rerun adapter removal helper script to generate new text file with the files that are left to be completed
-# updated this file to reflect the files that were successfully completed: crossbill_metadataForAdapterRemoval.csv
+parallel -j 11 < /workdir/kcarbeck/rawdata/adapterRemovalCommands.txt 2>&1 | tee adapterRemoval.log
+# started around 10 AM March 24
+# finished remaining samples next day
 
 
 
-##run adapterRemovalCommands.txt in parallel on 64 core machine
-#this funnels the output to a log file and displays it on the screen
-parallel -j 10 < /workdir/kcarbeck/rawdata/adapterRemovalCommands.txt 2>&1 | tee adapterRemoval.log
-# started around 4PM 4 Mar 25
+#### transfer files out:
+# dry run
+rsync -avh --dry-run --progress --delete /workdir/kcarbeck/adapterRemoval/ /lustre2/home/lc736_0001/crossbill/adapterRemoval/
 
+nohup rsync -avh --progress --partial --inplace --delete /workdir/kcarbeck/adapterRemoval/ /lustre2/home/lc736_0001/crossbill/adapterRemoval/ > rsync_log.txt 2>&1 &
+# -avh: archive mode, verbose, human readable file sizes
+# --partial: keeps partially transferred files and can pick back up if interrupted
+# --inplace: writes directly to destination (not sure if this is necessary?)
+# --delete: deletes extra files at the destination
 
-
-##########   March 5 2025    #############
-# finished by the morning but had a few errors regarding gzipped files and samples that had more than one fastq associated with them
-# gzip_paired_fastq::~gzip_paired_fastq: data error
-
-
-## RUNNING CHECKS...
-# to see if fastq files are not corrupted
-# and to see if the adapter removal output is as expected
-
-## update: ultimately found that one preferred sample name was duplicated so updated those IDs and ran again; 
-
-
+# tail -f rsync_log.txt
+# Ctrl + C
